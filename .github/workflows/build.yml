@@ -23,10 +23,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.2.1'
-      - name: Restore project source archive
+      - name: Extract uploaded project archive
         run: |
           mkdir -p project
-          base64 -d project-source.tar.gz.b64 | tar -xz -C project
+          unzip -q heaven-hell-fabric-v0.3.0-dev.zip -d project
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
