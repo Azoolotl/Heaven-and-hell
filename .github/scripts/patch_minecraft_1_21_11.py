@@ -410,3 +410,284 @@ replace_upgrade(example, '  "hellfireChainsDamage": 6.0,', '  "hellfireChainsDam
 replace_upgrade(example, '  "zoneDamage": 2.0,', '  "zoneDamage": 3.0,')
 
 print("Applied Heaven & Hell v0.3.1 gameplay, cosmetic, and GUI upgrades.")
+
+
+
+# Heaven & Hell v0.4 gameplay and presentation updates.
+import base64
+
+passives = source / "gameplay/PassiveAbilityService.java"
+replace_exact(passives, "import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;\n",
+    "import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;\nimport net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;\n")
+replace_exact(passives, "import net.minecraft.server.level.ServerPlayer;\n",
+    "import net.minecraft.server.level.ServerPlayer;\nimport net.minecraft.tags.DamageTypeTags;\n")
+replace_exact(passives,
+    """    public static void register() {
+        ServerTickEvents.END_SERVER_TICK.register(PassiveAbilityService::onServerTick);
+    }
+""",
+    """    public static void register() {
+        ServerTickEvents.END_SERVER_TICK.register(PassiveAbilityService::onServerTick);
+        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, damageSource, amount) -> {
+            if (!(entity instanceof ServerPlayer player) || !damageSource.is(DamageTypeTags.IS_FALL)) return true;
+            PlayerData data = HeavenHell.DATA.get(player.getUUID());
+            return data.race != Race.ANGEL || data.isPowerless()
+                    || (data.rank() != Rank.ARCHANGEL && data.rank() != Rank.SERAPHIM);
+        });
+    }
+""")
+replace_exact(passives,
+    """                if (!player.onGround() && player.getDeltaMovement().y < -0.15) {
+                    applyWithoutDowngrading(player, MobEffects.SLOW_FALLING, 0, 25);
+                }
+""", "")
+replace_exact(passives,
+    """        for (ServerPlayer target : level.players()) {
+            if (target == player || player.distanceToSqr(target) > radiusSquared) continue;
+            if (!HeavenHell.CONFIG.friendlyFire && player.isAlliedTo(target)) continue;
+            applyWithoutDowngrading(target, MobEffects.WEAKNESS, 0, pulse + 10);
+        }
+""",
+    """        for (ServerPlayer target : level.players()) {
+            if (target == player || player.distanceToSqr(target) > radiusSquared) continue;
+            PlayerData targetData = HeavenHell.DATA.get(target.getUUID());
+            if (targetData.race == Race.DEMON || player.isAlliedTo(target)) continue;
+            applyWithoutDowngrading(target, MobEffects.WEAKNESS, 0, pulse + 10);
+        }
+""")
+
+abilities = source / "gameplay/ActiveAbilityService.java"
+replace_exact(abilities, "import net.minecraft.core.BlockPos;\n",
+    "import net.minecraft.core.BlockPos;\nimport net.minecraft.world.entity.EntitySpawnReason;\nimport net.minecraft.world.entity.EntityType;\nimport net.minecraft.world.entity.LightningBolt;\n")
+replace_exact(abilities, "    private static final List<Zone> ZONES = new ArrayList<>();\n",
+    "    private static final List<Zone> ZONES = new ArrayList<>();\n    private static final List<PendingMeteor> METEORS = new ArrayList<>();\n")
+replace_exact(abilities, "        ZONES.removeIf(zone -> zone.owner.equals(playerId));\n",
+    "        ZONES.removeIf(zone -> zone.owner.equals(playerId));\n        METEORS.removeIf(meteor -> meteor.owner.equals(playerId));\n", expected=2)
+replace_exact(abilities,
+    """        ZONES.add(new Zone(player, Race.DEMON, radius, HeavenHell.CONFIG.infernalCataclysmDurationSeconds * 20));
+        return true;
+""",
+    """        ZONES.add(new Zone(player, Race.DEMON, radius, HeavenHell.CONFIG.infernalCataclysmDurationSeconds * 20));
+        summonMiniMeteors(player, 8, radius * 0.88);
+        return true;
+""")
+replace_exact(abilities,
+    """        if (target instanceof ServerPlayer other) {
+            return other != owner && (HeavenHell.CONFIG.friendlyFire || !owner.isAlliedTo(other));
+        }
+""",
+    """        if (target instanceof ServerPlayer other) {
+            if (other == owner) return false;
+            PlayerData ownerData = HeavenHell.DATA.get(owner.getUUID());
+            PlayerData targetData = HeavenHell.DATA.get(other.getUUID());
+            if (ownerData.race != Race.HUMAN && ownerData.race == targetData.race) return false;
+            if (ownerData.race == Race.DEMON && owner.isAlliedTo(other)) return false;
+            return HeavenHell.CONFIG.friendlyFire || !owner.isAlliedTo(other);
+        }
+""")
+replace_exact(abilities,
+    """                entity.hurt(owner.damageSources().playerAttack(owner), HeavenHell.CONFIG.zoneDamage);
+            } else {
+""",
+    """                strikeHolyLightning(zone, owner, entity);
+            } else {
+""")
+replace_exact(abilities, "        Iterator<Zone> zoneIterator = ZONES.iterator();\n",
+    """        Iterator<PendingMeteor> meteorIterator = METEORS.iterator();
+        while (meteorIterator.hasNext()) {
+            PendingMeteor meteor = meteorIterator.next();
+            ServerPlayer owner = server.getPlayerList().getPlayer(meteor.owner);
+            PlayerData ownerData = owner == null ? null : HeavenHell.DATA.get(owner.getUUID());
+            if (owner == null || !owner.isAlive() || owner.level() != meteor.level
+                    || ownerData == null || ownerData.race != Race.DEMON || ownerData.isPowerless()
+                    || ownerData.rank() != Rank.DEMON_LORD) {
+                meteorIterator.remove();
+                continue;
+            }
+            meteor.ticksLeft--;
+            double trailY = meteor.impact.y + Math.max(0.0, meteor.ticksLeft) * 0.68 + 0.8;
+            meteor.level.sendParticles(ParticleTypes.FLAME, meteor.impact.x, trailY, meteor.impact.z,
+                    10, 0.28, 0.35, 0.28, 0.055);
+            meteor.level.sendParticles(ParticleTypes.SMOKE, meteor.impact.x, trailY + 0.25, meteor.impact.z,
+                    5, 0.20, 0.25, 0.20, 0.025);
+            if (meteor.ticksLeft <= 0) {
+                impactMeteor(owner, meteor);
+                meteorIterator.remove();
+            }
+        }
+
+        Iterator<Zone> zoneIterator = ZONES.iterator();
+""")
+replace_exact(abilities,
+    """    /**
+     * Carves a small, controlled crater without drops. It only removes ordinary, breakable
+""",
+    """    private static void strikeHolyLightning(Zone zone, ServerPlayer owner, LivingEntity target) {
+        LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(zone.level, EntitySpawnReason.TRIGGERED);
+        if (bolt != null) {
+            bolt.setVisualOnly(true);
+            bolt.setPos(target.getX(), target.getY(), target.getZ());
+            zone.level.addFreshEntity(bolt);
+        }
+        target.hurt(zone.level.damageSources().magic(), HeavenHell.CONFIG.zoneDamage);
+        zone.level.sendParticles(ParticleTypes.ELECTRIC_SPARK, target.getX(), target.getY() + 0.9,
+                target.getZ(), 26, 0.42, 0.8, 0.42, 0.12);
+    }
+
+    private static void summonMiniMeteors(ServerPlayer owner, int count, double radius) {
+        ServerLevel level = owner.level();
+        for (int i = 0; i < count; i++) {
+            double angle = owner.getRandom().nextDouble() * Math.PI * 2.0;
+            double distance = Math.sqrt(owner.getRandom().nextDouble()) * radius;
+            int x = (int) Math.floor(owner.getX() + Math.cos(angle) * distance);
+            int z = (int) Math.floor(owner.getZ() + Math.sin(angle) * distance);
+            BlockPos surface = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+                    new BlockPos(x, owner.blockPosition().getY(), z));
+            Vec3 impact = new Vec3(x + 0.5, surface.getY() + 0.15, z + 0.5);
+            METEORS.add(new PendingMeteor(owner.getUUID(), level, impact, 12 + owner.getRandom().nextInt(34)));
+        }
+    }
+
+    private static void impactMeteor(ServerPlayer owner, PendingMeteor meteor) {
+        Vec3 point = meteor.impact;
+        double radius = 2.65;
+        meteor.level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, point.x, point.y + 0.1, point.z, 1, 0, 0, 0, 0);
+        meteor.level.sendParticles(ParticleTypes.FLAME, point.x, point.y + 0.2, point.z, 48, 0.8, 0.35, 0.8, 0.12);
+        meteor.level.sendParticles(ParticleTypes.LAVA, point.x, point.y + 0.1, point.z, 12, 0.65, 0.15, 0.65, 0.02);
+        meteor.level.sendParticles(ParticleTypes.SMOKE, point.x, point.y + 0.4, point.z, 24, 0.6, 0.35, 0.6, 0.06);
+        AABB area = new AABB(point.x - radius, point.y - 1.5, point.z - radius,
+                point.x + radius, point.y + 2.5, point.z + radius);
+        for (LivingEntity target : meteor.level.getEntitiesOfClass(LivingEntity.class, area,
+                e -> e.isAlive() && !(e instanceof ArmorStand)
+                        && e.position().distanceToSqr(point) <= radius * radius && isEnemy(owner, e))) {
+            target.hurt(owner.damageSources().playerAttack(owner), 10.0f);
+            target.igniteForSeconds(4);
+            Vec3 away = target.position().subtract(point);
+            if (away.lengthSqr() < 0.0001) away = new Vec3(0, 0, 1);
+            away = away.normalize();
+            target.setDeltaMovement(target.getDeltaMovement().add(away.x * 0.75, 0.35, away.z * 0.75));
+            target.hurtMarked = true;
+        }
+    }
+
+    /**
+     * Carves a small, controlled crater without drops. It only removes ordinary, breakable
+""")
+replace_exact(abilities, "    private static final class Zone {\n",
+    """    private static final class PendingMeteor {
+        final UUID owner;
+        final ServerLevel level;
+        final Vec3 impact;
+        int ticksLeft;
+        PendingMeteor(UUID owner, ServerLevel level, Vec3 impact, int ticksLeft) {
+            this.owner = owner; this.level = level; this.impact = impact; this.ticksLeft = ticksLeft;
+        }
+    }
+
+    private static final class Zone {
+""")
+
+config = source / "config/HeavenHellConfig.java"
+replace_exact(config, "public float holyBurstDamage = 6.0f,", "public float holyBurstDamage = 9.0f,")
+replace_exact(config, "public float divineJudgementDamage = 10.0f,", "public float divineJudgementDamage = 16.0f,")
+replace_exact(config, "public float infernalBlastDamage = 7.0f,", "public float infernalBlastDamage = 10.0f,")
+replace_exact(config, "public float hellfireChainsDamage = 9.0f,", "public float hellfireChainsDamage = 14.0f,")
+replace_exact(config, "public float zoneDamage = 3.0f,", "public float zoneDamage = 5.0f,")
+replace_exact(config,
+    """        if (Float.compare(zoneDamage, 2.0f) == 0) { zoneDamage = 3.0f; changed = true; }
+        return changed;
+""",
+    """        if (Float.compare(zoneDamage, 2.0f) == 0) { zoneDamage = 3.0f; changed = true; }
+        if (Float.compare(holyBurstDamage, 6.0f) == 0) { holyBurstDamage = 9.0f; changed = true; }
+        if (Float.compare(divineJudgementDamage, 10.0f) == 0) { divineJudgementDamage = 16.0f; changed = true; }
+        if (Float.compare(infernalBlastDamage, 7.0f) == 0) { infernalBlastDamage = 10.0f; changed = true; }
+        if (Float.compare(hellfireChainsDamage, 9.0f) == 0) { hellfireChainsDamage = 14.0f; changed = true; }
+        if (Float.compare(zoneDamage, 3.0f) == 0) { zoneDamage = 5.0f; changed = true; }
+        return changed;
+""")
+
+layer = source / "client/render/RaceWingsLayer.java"
+replace_exact(layer, "        matrices.translate(0.0, 0.0, 0.10);\n",
+    "        matrices.translate(0.0, 0.0, 0.19);\n        matrices.scale(1.42F, 1.42F, 1.0F);\n")
+model = source / "client/render/RaceWingsModel.java"
+replace_exact(model,
+    """        addWing(root, "left_wing", 1, -9.2F, 2.55F, 1.0F, 0.0F, thin);
+        addWing(root, "right_wing", -1, -9.2F, 2.55F, 1.0F, 0.0F, thin);
+        addWing(root, "left_wing_two", 1, -8.3F, 2.72F, 0.88F, 0.20F, thin);
+        addWing(root, "right_wing_two", -1, -8.3F, 2.72F, 0.88F, -0.20F, thin);
+        addWing(root, "left_wing_three", 1, -9.8F, 2.88F, 1.08F, -0.18F, thin);
+        addWing(root, "right_wing_three", -1, -9.8F, 2.88F, 1.08F, 0.18F, thin);
+""",
+    """        addWing(root, "left_wing", 1, -8.8F, 2.75F, 1.22F, 0.0F, thin);
+        addWing(root, "right_wing", -1, -8.8F, 2.75F, 1.22F, 0.0F, thin);
+        addWing(root, "left_wing_two", 1, -8.0F, 2.92F, 1.08F, 0.20F, thin);
+        addWing(root, "right_wing_two", -1, -8.0F, 2.92F, 1.08F, -0.20F, thin);
+        addWing(root, "left_wing_three", 1, -9.4F, 3.08F, 1.28F, -0.18F, thin);
+        addWing(root, "right_wing_three", -1, -9.4F, 3.08F, 1.28F, 0.18F, thin);
+""")
+textures = project / "src/main/resources/assets/heavenhell/textures/entity"
+(textures / "angel_wings.png").write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADMUlEQVR4nO2b60/bMBTFT+g2acCgtOUN+5P3J07qi/SVPoAyjdKcfbgJdmo7fNgkD+wjWVF6kvT6yrn5tXaS7TMJAHufAb4AwzkAAEki2+sOig9kM9rxz09Q0ey+6re/Vf3lU9U//lr1F2tAIpLt7vnTVdXf/f40q/rXbQAE0JD+DXb8PQSumADfAfhW8AlANyW7KUmSvRHJl6JtpQ2n0kjybkZD44U0kpwsTT97kEaS80fTXz6Ri7Xbn92T05X7+qM5mWY78eVF25KDCdkfq/7lG3L7LO3lNxn8CHhNQH8M3J67D0wz4LLt9qcr4PTY7S/WwMmB218+1fuz+/rrj+b18Q0m9v7FEeA7AN9KShJMEiD5JEOl3Ac+EAkCQENu9UiCmmICfAfgW8EnIOmmqgjengPYlo5s7rSiZ3vOTpbKtz2n54/Ktz3nV79UUWrum372oPzOkemPF8q/aBUfUm2HWlG8OZOfxLEIaooJ8B2Ab1US0B8DaLgPTrP6i01X9f5i/Xf+W9d/K77+WGBPV4UEAUWDLhIEhAZdJAgIDbpIEBAadJEgoAqnjQQBVXhtJAgAdzPl6yRISv96I7UfbwHfAfhWTIDvAHyrQoKARoMWEgRMGtRJEDBpUCdBwKRBnQRJ09dJkDSvr5MgWcTnIEFS+pdv1H7wIyAmwHcAvhV8AiIJmqeHpYQ/f/Dtwz6u4gjYrQHDufx1NJzKvm1e4KIlAALY5wU6RwIwgH1eoLkvAATY5wVODqQOuOYFTo+lDrjmBS7bUgdsNWCQCQz1RkVNMEiwA/lPIJf9d0mCKDptIcGbthTCfBOLIACYgJiA4BMQ/FMg+BEQE+A7AN8KPgF2EgReafBdkiAhRTu3kyApi8O3z3EExATEBPgOwLesJAgoGnStEyxp0LVOsKRB1zrBkgZd6wRbh/bzy3WCZ03795frBK86RfwWEiSB7xdAN40jICYgJsB3AL4VSRCBy52AvNb9/0XUxp9vgMaX993Ff6LgE+AkwSQBrk+hlptY3hhxzQyXvmtmuPRtM8P6GyOtQ9PX3xg5a5q+/sbIVQdyK1tIEBAaDH4ExAT4DsC3/gAYmSEQf7yX5wAAAABJRU5ErkJggg=="))
+(textures / "demon_wings.png").write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAElklEQVR4nO2bzXNTVRjGf5dckKZJaSOuWbgmXWppLTilbdqmIrYgUFy4cwkWUCof1lHUoeq/4EJxoSyU2GlpGUoBOy5T/gw+gjRt/QrHxb3n3pOTk+k4whw159llnrc3p+8kv/vcc954xzI7xBc9Ccbn/8RD0J6q4AmBB3gIjnQkmbj6a/BahD4CT8BIV5rJmdWq+vbmwM93tzF94wF3yomoXl6/d892rl2/i4egWPYRgPA8BHAi38bMjfsIgtfF1dDH473BNN/f/KWqvlj2ER580J/kzOw6O9OPo3rhBf6nvVs4Of8HAtiZeozwiK6/iQaXa4DtBdhWwzfAz6YqQIJsCLflcqIaghB6AQSXFaiNSE+pX14J/DywXE5UQVNevzf0PATZVKUKaoSehFQ2XYmgFntxfTZVQQQW2VQlhmoIweD/I3ofCU0HwVCuAW++sIUvf/7NaH7S+wzf/LRm9CZzSd6fWTV6E4MtfDz9yOiN59v4/MoDo9e3ZzsXCw+N3nB3Kz/cNHujnWm+vV02emMdTXy1tG70wH0C8CEEkpLUJNQiL0SQmgQhAIsOzXYFOjo0PQR9KFDVkmAvMdSiJBj6Eqo6NItlnxFiOKrQlHBcLidqoOkgGMo1wPYCbKvhG+CDBBY1SXBMegoEJdRGUZKelgSHIbqOngSRXlivQk16KqQk1OQ69cdnY9IjhqBMsvrjs4NgKNcA2wuwrYZvgEuCT73F/3K5BthegG1tOn6tYjTGOpq4tGTeCxjtTHP51orRG+5upbBYMnon8m3MLdwzeuP5NqYK5r+bGGzho2nz+03mkpybNa/zSEeSd+Z+N3pSfjZVu2fniTixtRuS4AFiOOpJEJSkpyXByFPqJdRASXpaEpSePOhQIfia9DRoCjwOgxGaDoKKXANsL8C2Gr4Bvp7UJNQgTHortUlQeqaDlFdQkp6WBPuJE6KeBPeiJD0tCQ4RPyY/qYMUB8FQnnjrebFx2f9X7hNwLLNDmBhwNEyCdwwMONCZ4vKtFTxEMAGifKfPDKQpLJaienVC5GS+lbmFe0YGvD2cYapQqpngKK76nA6ToPDCCQ+UINTVwrnZtahenRA5vCtIgmq9fn2XBJ/Gx+q/JNcA2wuwrYZvgPEu8MaLW/l6aT2gvHYX+LC/ie9ur0T16l3g7ECKK4sPq+rlXeDUUCtThVINNItln+PDGT4rlIyUHtyd4cL0o2iPT70L7O9q4fzMWlW9vAsc2tXMpaW1Gmi6OUFNrgG2F2BbDd8AYxIELekpUIu8J3SQstEc3yBK0tOS4H7qH6Qcov5BioOgItcA2wuwrYZvgHFPEDbHe35aEjxI/ZGafcR7hfqeYA7zSE2x7NODcrqrQQ2UPT9tTzDy/uZIjYOgItcA2wuwrYZvgEuCekcu7t3MqTpn6gc7U5ydNc/e73tpW915/tzuZ5lduG/0el5+jvnrd43eu0Pb+LHOrMH5XHPd3ytc6NvK6avm30DoavivgGuA7QXYVk0ShOo5PjUJvo6S9LQk+Cr1D1IG2PggxZTUIo/qn8H9k4MUlwQ1uQbYXoBt/QUEaxwsTgsOzAAAAABJRU5ErkJggg=="))
+
+screen = source / "client/RaceStatusScreen.java"
+replace_exact(screen, "        int panelWidth = 300;\n        int panelHeight = 224;\n",
+    "        int panelWidth = 340;\n        int panelHeight = 312;\n")
+replace_exact(screen,
+    """            String[] abilities = unlockedAbilities(status.raceId(), status.rankId());
+            int lineY = dividerY + 25;
+""",
+    """            String[] abilities = unlockedAbilities(status.raceId(), status.rankId());
+            String[] descriptions = abilityDescriptions(status.raceId(), status.rankId());
+            int lineY = dividerY + 25;
+""")
+replace_exact(screen,
+    """                    graphics.drawString(this.font, "• " + abilities[i], left + 24, lineY, 0xFFFFFFFF);
+                    graphics.drawString(this.font, cooldown, left + panelWidth - 91, lineY, 0xFFBFB4D5);
+                    lineY += 13;
+""",
+    """                    graphics.drawString(this.font, "• " + abilities[i], left + 24, lineY, 0xFFFFFFFF);
+                    graphics.drawString(this.font, cooldown, left + panelWidth - 91, lineY, 0xFFBFB4D5);
+                    graphics.drawString(this.font, descriptions[i], left + 34, lineY + 10, 0xFFB8AEC9);
+                    lineY += 26;
+""")
+marker = """    @Override
+    public boolean isPauseScreen() { return false; }
+"""
+descriptions = """    private static String[] abilityDescriptions(int race, int rank) {
+        if (race == 1) {
+            return switch (rank) {
+                case 1 -> new String[]{"Slowly restores your health.", "Blast enemies and heal nearby allies."};
+                case 2 -> new String[]{"Slowly restores your health.", "Resist damage and negate all fall damage.",
+                        "Blast enemies and heal nearby allies.", "Mark and strike a distant enemy."};
+                case 3 -> new String[]{"Slowly restores your health.", "Resist damage and negate all fall damage.",
+                        "Immune to poison; frighten nearby hostiles.", "Blast enemies and heal nearby allies.",
+                        "Mark and strike a distant enemy.", "Call armour-piercing lightning strikes."};
+                default -> new String[0];
+            };
+        }
+        if (race == 2) {
+            return switch (rank) {
+                case 4 -> new String[]{"Fire resistance and a chance to ignite foes.", "Explosive fire burst that ignites enemies."};
+                case 5 -> new String[]{"Fire resistance and a chance to ignite foes.", "Melee hits restore health.",
+                        "Explosive fire burst that ignites enemies.", "Pull and stun a targeted enemy."};
+                case 6 -> new String[]{"Fire resistance and a chance to ignite foes.", "Melee hits restore health.",
+                        "Weaken nearby hostile mobs and enemy players.", "Explosive fire burst that ignites enemies.",
+                        "Pull and stun a targeted enemy.", "Burning zone with random mini meteors."};
+                default -> new String[0];
+            };
+        }
+        return new String[0];
+    }
+
+"""
+replace_exact(screen, marker, descriptions + marker)
+for old, new in [
+    ('"holyBurstDamage": 6.0', '"holyBurstDamage": 9.0'),
+    ('"divineJudgementDamage": 10.0', '"divineJudgementDamage": 16.0'),
+    ('"infernalBlastDamage": 7.0', '"infernalBlastDamage": 10.0'),
+    ('"hellfireChainsDamage": 9.0', '"hellfireChainsDamage": 14.0'),
+    ('"zoneDamage": 3.0', '"zoneDamage": 5.0')
+]:
+    replace_exact(project / "config/heavenhell.example.json", old, new)
+
+print("Applied Heaven & Hell v0.4 gameplay, wings, and GUI updates.")
