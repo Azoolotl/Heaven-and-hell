@@ -27,20 +27,22 @@ jobs:
         run: |
           mkdir -p project
           unzip -q heaven-hell-fabric-v0.3.0-dev.zip -d project
-      - name: Patch Minecraft 1.21.11 API compatibility
+      - name: Patch Minecraft 1.21.11 API compatibility and existing updates
         run: python .github/scripts/patch_minecraft_1_21_11.py project/heaven-hell-fabric
+      - name: Patch Angel regeneration and race projectile abilities
+        run: python .github/scripts/patch_requested_abilities.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.3.0-dev-fixed-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.3.0-dev-updated-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-0.3.0-dev-build
+          name: heaven-hell-fabric-0.3.1-race-abilities
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.3.0-dev-fixed-src.zip
+            heaven-hell-fabric-v0.3.0-dev-updated-src.zip
           if-no-files-found: error
