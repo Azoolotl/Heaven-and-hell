@@ -31,18 +31,20 @@ jobs:
         run: python .github/scripts/patch_minecraft_1_21_11.py project/heaven-hell-fabric
       - name: Patch Angel regeneration and race projectile abilities
         run: python .github/scripts/patch_requested_abilities.py project/heaven-hell-fabric
+      - name: Add Awakening energy, activation, lifecycle and multiplayer foundation
+        run: python .github/scripts/patch_awakening_foundation.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.3.0-dev-updated-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.5-awakening-foundation-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-0.3.1-race-abilities
+          name: heaven-hell-fabric-v0.5-awakening-foundation
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.3.0-dev-updated-src.zip
+            heaven-hell-fabric-v0.5-awakening-foundation-src.zip
           if-no-files-found: error
