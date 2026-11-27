@@ -35,18 +35,20 @@ jobs:
         run: python .github/scripts/patch_awakening_foundation.py project/heaven-hell-fabric
       - name: Fix Minecraft 1.21.11 Awakening particle option
         run: python .github/scripts/fix_awakening_particle.py project/heaven-hell-fabric
+      - name: Apply PvP progression, empowered abilities, physical wings and Awakening HUD
+        run: python .github/scripts/patch_awakening_rework.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.5-awakening-foundation-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.6.0-dev-awakening-rework-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.5-awakening-foundation
+          name: heaven-hell-fabric-v0.6.0-dev-awakening-rework
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.5-awakening-foundation-src.zip
+            heaven-hell-fabric-v0.6.0-dev-awakening-rework-src.zip
           if-no-files-found: error
