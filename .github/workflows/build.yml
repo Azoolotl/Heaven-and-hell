@@ -33,6 +33,8 @@ jobs:
         run: python .github/scripts/patch_requested_abilities.py project/heaven-hell-fabric
       - name: Add Awakening energy, activation, lifecycle and multiplayer foundation
         run: python .github/scripts/patch_awakening_foundation.py project/heaven-hell-fabric
+      - name: Fix Minecraft 1.21.11 Awakening particle option
+        run: python .github/scripts/fix_awakening_particle.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
