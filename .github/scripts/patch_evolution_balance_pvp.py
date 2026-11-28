@@ -76,13 +76,17 @@ new_handler = """    private static void onEntityDeath(LivingEntity dead, Damage
         if (count >= required) completeTrial(killer, data);
     }
 """
-if (old_handler in source) source = source.replace(old_handler, new_handler, 1)
-elif new_handler not in source: raise Error("Evolution death handler did not match expected source")
+if old_handler in source:
+    source = source.replace(old_handler, new_handler, 1)
+elif new_handler not in source:
+    raise SystemExit("Evolution death handler did not match expected source")
 source = source.replace("Defeat five different hostile mob species.",
                         "Earn five unique combat victories against hostile mobs or enemy players.")
 source = source.replace("different hostile mob species defeated. The Dragon's Breath has already been offered.",
                         "unique combat victories earned. Hostile mob species and distinct enemy players both count. The Dragon's Breath has already been offered.")
-if "MobEffects.SLOW_FALLING" in source: raise Error("Slow Falling still present in Evolution passives")
-if 'progressKey = "player:" + victim.getUUID();' not in source: raise Error("PvP progression patch missing")
+if "MobEffects.SLOW_FALLING" in source:
+    raise SystemExit("Slow Falling still present in Evolution passives")
+if 'progressKey = "player:" + victim.getUUID();' not in source:
+    raise SystemExit("PvP progression patch missing")
 path.write_text(source, encoding="utf-8")
 print("Updated Evolution passives and PvP trial progression.")
