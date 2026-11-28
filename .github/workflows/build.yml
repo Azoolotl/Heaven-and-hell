@@ -47,6 +47,7 @@ jobs:
         run: |
           python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_ascension_unlock.py.gz.b64'); pathlib.Path('.github/scripts/patch_ascension_unlock.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
           python .github/scripts/patch_ascension_unlock.py project/heaven-hell-fabric
+          python -c "from pathlib import Path; p=Path('project/heaven-hell-fabric/src/main/java/com/kuku/heavenhell/gameplay/AwakeningService.java'); s=p.read_text(); old='data.awakeningEnergy -= HeavenHell.CONFIG.awakeningRequiredEnergy;'; assert old in s; p.write_text(s.replace(old, old+'\\n        data.awakeningReadyNotified = false;', 1))"
       - name: Create patched source archive
         run: |
           cd project
