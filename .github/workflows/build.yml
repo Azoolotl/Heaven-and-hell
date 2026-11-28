@@ -43,17 +43,21 @@ jobs:
         run: python .github/scripts/patch_awakening_raw_damage.py project/heaven-hell-fabric
       - name: Set corrective Awakening release version
         run: python .github/scripts/patch_awakening_version.py project/heaven-hell-fabric
+      - name: Apply top-rank Ascension unlock, quest and chat notifications
+        run: |
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_ascension_unlock.py.gz.b64'); pathlib.Path('.github/scripts/patch_ascension_unlock.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python .github/scripts/patch_ascension_unlock.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.7.0-dev-ascension-unlock-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix
+          name: heaven-hell-fabric-v0.7.0-dev-ascension-unlock
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
             heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix-src.zip
