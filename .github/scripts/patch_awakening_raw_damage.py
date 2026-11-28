@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make Awakening damage progression use pre-mitigation damage from Fabric's AFTER_DAMAGE event."""
+"""Make Awakening progression use pre-armor damage and remove obsolete health snapshots."""
 import sys
 from pathlib import Path
 
@@ -27,15 +27,14 @@ old = """    /** Uses health actually lost, not attempted/pre-mitigation damage.
         }
     }
 """
-new = """    /** Uses Fabric's pre-mitigation base damage, so armor does not reduce Awakening progress. */
+new = """    /** Uses Fabric's pre-armor base damage, so armor does not reduce Awakening progress. */
     public static void onLivingEntityDamaged(LivingEntity victim, DamageSource source,
                                               float baseDamageTaken, float damageTaken, boolean blocked) {
         if (blocked || victim == null || source == null || victim instanceof ArmorStand) return;
-        // AFTER_DAMAGE supplies baseDamageTaken before armor/toughness mitigation; damageTaken
-        // is the post-mitigation amount. Progress intentionally uses the former.
+        // Fabric AFTER_DAMAGE provides baseDamageTaken before armor and enchantment reduction.
+        // Shield-blocked hits are excluded by the blocked flag above.
         float progressDamage = Math.max(0.0F, baseDamageTaken);
         if (!Float.isFinite(progressDamage) || progressDamage <= 0.0F) return;
-        HEALTH_BEFORE_DAMAGE.remove(victim);
 
         Entity attacker = resolveAttacker(source);
         if (attacker instanceof ServerPlayer playerAttacker
@@ -52,5 +51,18 @@ new = """    /** Uses Fabric's pre-mitigation base damage, so armor does not red
 """
 if old not in source:
     raise SystemExit("Expected original Awakening damage handler not found; refusing unsafe patch")
-path.write_text(source.replace(old, new), encoding="utf-8")
-print("Patched Awakening progress to use pre-mitigation baseDamageTaken")
+source = source.replace(old, new)
+
+# These snapshots were only used by the old post-armor health-difference calculation.
+source = source.replace(
+    "    private static final Map<LivingEntity, Float> HEALTH_BEFORE_DAMAGE = new java.util.WeakHashMap<>();\n", ""
+)
+source = source.replace("            HEALTH_BEFORE_DAMAGE.put(entity, entity.getHealth());\n", "")
+source = source.replace("        HEALTH_BEFORE_DAMAGE.remove(victim);\n", "")
+source = source.replace("        if (dead != null) HEALTH_BEFORE_DAMAGE.remove(dead);\n", "")
+source = source.replace("        HEALTH_BEFORE_DAMAGE.remove(player);\n", "")
+if "HEALTH_BEFORE_DAMAGE" in source:
+    raise SystemExit("Obsolete health snapshot references remain; refusing incomplete cleanup")
+
+path.write_text(source, encoding="utf-8")
+print("Patched Awakening progress to use raw pre-armor damage")
