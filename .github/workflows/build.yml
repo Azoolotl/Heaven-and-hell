@@ -60,5 +60,5 @@ jobs:
           name: heaven-hell-fabric-v0.7.0-dev-ascension-unlock
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix-src.zip
+            heaven-hell-fabric-v0.7.0-dev-ascension-unlock-src.zip
           if-no-files-found: error
