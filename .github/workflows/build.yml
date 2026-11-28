@@ -1,8 +1,8 @@
-name: Build Heaven & Hell
+name: Build Heaven & Hell — Sovereigns validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/age-of-ascension-foundation]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -54,18 +54,40 @@ jobs:
           python .github/scripts/patch_homing_meteors_and_supernova.py project/heaven-hell-fabric
       - name: Apply Protection IV ability damage balance
         run: python .github/scripts/patch_ability_damage_balance.py project/heaven-hell-fabric
+      - name: Apply Age of Ascension mastery and relic foundation
+        run: |
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_age_of_ascension.py.gz.b64'); pathlib.Path('.github/scripts/patch_age_of_ascension.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python .github/scripts/patch_age_of_ascension.py project/heaven-hell-fabric
+      - name: Fix Age of Ascension relic tooltip API
+        run: python .github/scripts/patch_age_of_ascension_api_fix.py project/heaven-hell-fabric
+      - name: Apply Age of Evolution
+        run: |
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/templates/EvolutionService.java.gz.b64'); pathlib.Path('project/heaven-hell-fabric/src/main/java/com/kuku/heavenhell/gameplay/EvolutionService.java').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/templates/EvolutionSigilItem.java.gz.b64'); pathlib.Path('project/heaven-hell-fabric/src/main/java/com/kuku/heavenhell/items/EvolutionSigilItem.java').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_evolution.py.gz.b64'); pathlib.Path('.github/scripts/patch_evolution.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python .github/scripts/patch_evolution.py project/heaven-hell-fabric
+      - name: Fix Evolution wing renderer variable scope
+        run: python .github/scripts/patch_evolution_wing_scope.py project/heaven-hell-fabric
+      - name: Balance Evolution passives and add PvP trial progression
+        run: python .github/scripts/patch_evolution_balance_pvp.py project/heaven-hell-fabric
+      - name: Apply Sovereigns bosses and legendary weapons
+        run: |
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_sovereigns_foundation.py.gz.b64'); pathlib.Path('.github/scripts/patch_sovereigns_foundation.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python .github/scripts/patch_sovereigns_foundation.py project/heaven-hell-fabric
+      - name: Fix Sovereigns Minecraft 1.21.11 API compatibility
+        run: python .github/scripts/patch_sovereigns_api.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.7.1-dev-damage-balance-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v1.0.0-dev-sovereigns-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.7.1-dev-damage-balance
+          name: heaven-hell-fabric-v1.0.0-dev-sovereigns
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.7.1-dev-damage-balance-src.zip
+            heaven-hell-fabric-v1.0.0-dev-sovereigns-src.zip
           if-no-files-found: error
