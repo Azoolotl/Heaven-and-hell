@@ -60,17 +60,23 @@ jobs:
           python .github/scripts/patch_age_of_ascension.py project/heaven-hell-fabric
       - name: Fix Age of Ascension relic tooltip API
         run: python .github/scripts/patch_age_of_ascension_api_fix.py project/heaven-hell-fabric
+      - name: Apply Age of Evolution
+        run: |
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/templates/EvolutionService.java.gz.b64'); pathlib.Path('project/heaven-hell-fabric/src/main/java/com/kuku/heavenhell/gameplay/EvolutionService.java').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/templates/EvolutionSigilItem.java.gz.b64'); pathlib.Path('project/heaven-hell-fabric/src/main/java/com/kuku/heavenhell/items/EvolutionSigilItem.java').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_evolution.py.gz.b64'); pathlib.Path('.github/scripts/patch_evolution.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
+          python .github/scripts/patch_evolution.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.8.0-dev-age-of-ascension-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.9.0-dev-evolution-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.8.0-dev-age-of-ascension
+          name: heaven-hell-fabric-v0.9.0-dev-evolution
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
             heaven-hell-fabric-v0.8.0-dev-age-of-ascension-src.zip
