@@ -52,18 +52,20 @@ jobs:
         run: |
           python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_homing_meteors_and_supernova.py.gz.b64'); pathlib.Path('.github/scripts/patch_homing_meteors_and_supernova.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
           python .github/scripts/patch_homing_meteors_and_supernova.py project/heaven-hell-fabric
+      - name: Apply Protection IV ability damage balance
+        run: python .github/scripts/patch_ability_damage_balance.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.7.0-dev-ascension-unlock-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.7.1-dev-damage-balance-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.7.0-dev-ascension-unlock
+          name: heaven-hell-fabric-v0.7.1-dev-damage-balance
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.7.0-dev-ascension-unlock-src.zip
+            heaven-hell-fabric-v0.7.1-dev-damage-balance-src.zip
           if-no-files-found: error
