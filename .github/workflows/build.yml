@@ -39,6 +39,8 @@ jobs:
         run: python .github/scripts/fix_awakening_particle.py project/heaven-hell-fabric
       - name: Apply PvP progression, empowered abilities, physical wings and Awakening HUD
         run: python .github/scripts/patch_awakening_rework.py project/heaven-hell-fabric
+      - name: Fix Awakening progress to count pre-mitigation damage
+        run: python .github/scripts/patch_awakening_raw_damage.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
