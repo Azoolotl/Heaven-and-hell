@@ -89,4 +89,14 @@ if "MobEffects.SLOW_FALLING" in source:
 if 'progressKey = "player:" + victim.getUUID();' not in source:
     raise SystemExit("PvP progression patch missing")
 path.write_text(source, encoding="utf-8")
-print("Updated Evolution passives and PvP trial progression.")
+
+# Keep the embedded mod metadata aligned with the Evolution patch release.
+version_path = root / "gradle.properties"
+version_text = version_path.read_text(encoding="utf-8")
+if "mod_version=0.9.0-dev" in version_text:
+    version_text = version_text.replace("mod_version=0.9.0-dev", "mod_version=0.9.1-dev", 1)
+elif "mod_version=0.9.1-dev" not in version_text:
+    raise SystemExit("Unexpected mod_version; refusing an unreviewed version change")
+version_path.write_text(version_text, encoding="utf-8")
+
+print("Updated Evolution passives, PvP trial progression, and mod version 0.9.1-dev.")
