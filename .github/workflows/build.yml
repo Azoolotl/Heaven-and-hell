@@ -68,18 +68,20 @@ jobs:
           python .github/scripts/patch_evolution.py project/heaven-hell-fabric
       - name: Fix Evolution wing renderer variable scope
         run: python .github/scripts/patch_evolution_wing_scope.py project/heaven-hell-fabric
+      - name: Balance Evolution passives and add PvP trial progression
+        run: python .github/scripts/patch_evolution_balance_pvp.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.9.0-dev-evolution-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.9.1-dev-evolution-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.9.0-dev-evolution
+          name: heaven-hell-fabric-v0.9.1-dev-evolution
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.9.0-dev-evolution-src.zip
+            heaven-hell-fabric-v0.9.1-dev-evolution-src.zip
           if-no-files-found: error
