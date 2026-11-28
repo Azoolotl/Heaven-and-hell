@@ -41,18 +41,20 @@ jobs:
         run: python .github/scripts/patch_awakening_rework.py project/heaven-hell-fabric
       - name: Fix Awakening progress to count pre-mitigation damage
         run: python .github/scripts/patch_awakening_raw_damage.py project/heaven-hell-fabric
+      - name: Set corrective Awakening release version
+        run: python .github/scripts/patch_awakening_version.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
-          zip -qr ../heaven-hell-fabric-v0.6.0-dev-awakening-rework-src.zip heaven-hell-fabric
+          zip -qr ../heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix-src.zip heaven-hell-fabric
       - name: Build mod
         working-directory: project/heaven-hell-fabric
         run: gradle --no-daemon clean build
       - name: Upload mod and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: heaven-hell-fabric-v0.6.0-dev-awakening-rework
+          name: heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix
           path: |
             project/heaven-hell-fabric/build/libs/*.jar
-            heaven-hell-fabric-v0.6.0-dev-awakening-rework-src.zip
+            heaven-hell-fabric-v0.6.1-dev-awakening-damage-fix-src.zip
           if-no-files-found: error
