@@ -74,6 +74,8 @@ jobs:
         run: |
           python -c "import base64,gzip,pathlib; p=pathlib.Path('.github/scripts/patch_sovereigns_foundation.py.gz.b64'); pathlib.Path('.github/scripts/patch_sovereigns_foundation.py').write_bytes(gzip.decompress(base64.b64decode(p.read_text())))"
           python .github/scripts/patch_sovereigns_foundation.py project/heaven-hell-fabric
+      - name: Fix Sovereigns Minecraft 1.21.11 API compatibility
+        run: python .github/scripts/patch_sovereigns_api.py project/heaven-hell-fabric
       - name: Create patched source archive
         run: |
           cd project
